@@ -417,6 +417,7 @@ public class Utils {
 
     public static PublicKey pemStringToPublicKey(String pemString) throws IOException {
         StringReader stringReader = new StringReader(pemString);
+        
         PEMParser pemParser = new PEMParser(stringReader);
         SubjectPublicKeyInfo subjectPublicKeyInfo = (SubjectPublicKeyInfo) pemParser.readObject();
         JcaPEMKeyConverter converter = new JcaPEMKeyConverter().setProvider(new BouncyCastleProvider());
@@ -511,23 +512,14 @@ public class Utils {
         if (password == null)
             return pemStringToPublicKey(pemString);
         else {
-            String pemStringPlainText = decrypytPem(pemString, password);
-            return pemStringToPublicKey(pemStringPlainText);
+            // String pemStringPlainText = decrypytPem(pemString, password);
+            // return pemStringToPublicKey(pemStringPlainText);
+            return null;
         }
     }
 
-    public static String decrypytPem (String pemStringCipherText, String password) {
-        JcePEMDecryptorProviderBuilder builder = new JcePEMDecryptorProviderBuilder();
-        PEMDecryptorProvider decryptorProvider = builder.build(password.toCharArray());
-
-    }
-
     public static PublicKey convertPemStringToPublicKey (String pemString, String password) {
-        JcaPEMKeyConverter converter = new JcaPEMKeyConverter();
-        converter.setProvider(new BouncyCastleProvider());
-        JcePEMDecryptorProviderBuilder builder = new JcePEMDecryptorProviderBuilder();
-        PEMDecryptorProvider decryptorProvider = builder.build(password.toCharArray());
-        converter.setProvider(decryptorProvider);
+        return null;
     }
 
     public static PublicKey readPublicKeyFromPemFile(String filename) throws IOException {
@@ -536,7 +528,7 @@ public class Utils {
         PEMParser pemParser = new PEMParser(stringReader);
         SubjectPublicKeyInfo subjectPublicKeyInfo = (SubjectPublicKeyInfo) pemParser.readObject();
         JcaPEMKeyConverter converter = new JcaPEMKeyConverter();
-        converter.setProvider();
+        converter.setProvider(new BouncyCastleProvider());
         return converter.getPublicKey(subjectPublicKeyInfo);
     }
 
