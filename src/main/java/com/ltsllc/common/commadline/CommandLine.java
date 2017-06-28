@@ -18,7 +18,31 @@ package com.ltsllc.common.commadline;
 
 import java.util.Properties;
 
-public class CommandLine {
+abstract public class CommandLine {
+    abstract public Switches toSwitch (String argument);
+    abstract public String getUsageString();
+
+    public enum Switches {
+        Unknown(0),
+        PlaceHolder(1),
+        LAST(PlaceHolder.getIndex());
+
+        private int index;
+
+        public int getIndex() {
+            return index;
+        }
+
+        public void setIndex (int index) {
+            this.index = index;
+        }
+
+        Switches(int index) {
+            this.index = index;
+        }
+    }
+
+
     private String[] argv;
     private int argIndex = 0;
 
@@ -70,10 +94,34 @@ public class CommandLine {
     }
 
     public void parse () {
+        while (hasMoreArgs()) {
+            Switches aSwitch = toSwitch(getArg());
+            processSwitch(aSwitch);
+            advance();
+        }
     }
 
     public void backup () {
         if (argIndex > 0)
             argIndex--;
+    }
+
+    public int getUnrecognizedSwitchExitCode () {
+        return -1;
+    }
+
+    public void processSwitch(Switches aSwitch) {
+        String message = "The argument, " + getArg() + ", is unrecognized";
+        printErrorAndUsageAndExit(message, getUnrecognizedSwitchExitCode());
+    }
+
+    public void printErrorAndUsageAndExit (String message, int status) {
+        System.err.println(message);
+        System.err.println(getUsageString());
+        System.exit(status);
+    }
+
+    public void printErrorAndUsageAndExit (String message) {
+        printErrorAndUsageAndExit(message, -1);
     }
 }

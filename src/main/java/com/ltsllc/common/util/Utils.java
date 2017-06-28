@@ -19,9 +19,12 @@ package com.ltsllc.common.util;
 
 import org.bouncycastle.asn1.x509.SubjectPublicKeyInfo;
 import org.bouncycastle.jce.provider.BouncyCastleProvider;
+import org.bouncycastle.openssl.PEMDecryptor;
+import org.bouncycastle.openssl.PEMDecryptorProvider;
 import org.bouncycastle.openssl.PEMParser;
 import org.bouncycastle.openssl.PEMWriter;
 import org.bouncycastle.openssl.jcajce.JcaPEMKeyConverter;
+import org.bouncycastle.openssl.jcajce.JcePEMDecryptorProviderBuilder;
 
 import javax.crypto.Cipher;
 import javax.crypto.CipherInputStream;
@@ -478,6 +481,63 @@ public class Utils {
         } finally {
             Utils.closeIgnoreExceptions(fileWriter);
         }
+    }
+
+    public static String readAsString(String filename) throws IOException {
+        File file = new File(filename);
+        if (!file.exists()) {
+            throw new IOException("the file, " + filename + ", does not exist");
+        }
+
+        StringWriter stringWriter = new StringWriter();
+
+        FileReader fileReader = null;
+        try {
+            fileReader = new FileReader(filename);
+
+            int c = fileReader.read();
+            while (c != -1) {
+                stringWriter.write(c);
+                c = fileReader.read();
+            }
+        } finally {
+            Utils.closeIgnoreExceptions(fileReader);
+        }
+
+        return stringWriter.toString();
+    }
+
+    public static PublicKey pemStringToPublicKey(String pemString, String password) throws IOException {
+        if (password == null)
+            return pemStringToPublicKey(pemString);
+        else {
+            String pemStringPlainText = decrypytPem(pemString, password);
+            return pemStringToPublicKey(pemStringPlainText);
+        }
+    }
+
+    public static String decrypytPem (String pemStringCipherText, String password) {
+        JcePEMDecryptorProviderBuilder builder = new JcePEMDecryptorProviderBuilder();
+        PEMDecryptorProvider decryptorProvider = builder.build(password.toCharArray());
+
+    }
+
+    public static PublicKey convertPemStringToPublicKey (String pemString, String password) {
+        JcaPEMKeyConverter converter = new JcaPEMKeyConverter();
+        converter.setProvider(new BouncyCastleProvider());
+        JcePEMDecryptorProviderBuilder builder = new JcePEMDecryptorProviderBuilder();
+        PEMDecryptorProvider decryptorProvider = builder.build(password.toCharArray());
+        converter.setProvider(decryptorProvider);
+    }
+
+    public static PublicKey readPublicKeyFromPemFile(String filename) throws IOException {
+        String pemFileContents = readAsString(filename);
+        StringReader stringReader = new StringReader(pemFileContents);
+        PEMParser pemParser = new PEMParser(stringReader);
+        SubjectPublicKeyInfo subjectPublicKeyInfo = (SubjectPublicKeyInfo) pemParser.readObject();
+        JcaPEMKeyConverter converter = new JcaPEMKeyConverter();
+        converter.setProvider();
+        return converter.getPublicKey(subjectPublicKeyInfo);
     }
 
     public static byte[] readBytes(ServletInputStream inputStream) throws IOException {
