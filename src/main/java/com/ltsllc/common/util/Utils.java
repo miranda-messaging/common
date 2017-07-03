@@ -19,12 +19,18 @@ package com.ltsllc.common.util;
 
 import org.bouncycastle.asn1.x509.SubjectPublicKeyInfo;
 import org.bouncycastle.jce.provider.BouncyCastleProvider;
-import org.bouncycastle.openssl.PEMDecryptor;
-import org.bouncycastle.openssl.PEMDecryptorProvider;
-import org.bouncycastle.openssl.PEMParser;
-import org.bouncycastle.openssl.PEMWriter;
+import org.bouncycastle.openssl.*;
 import org.bouncycastle.openssl.jcajce.JcaPEMKeyConverter;
+import org.bouncycastle.openssl.jcajce.JceOpenSSLPKCS8EncryptorBuilder;
 import org.bouncycastle.openssl.jcajce.JcePEMDecryptorProviderBuilder;
+import org.bouncycastle.operator.ContentSigner;
+import org.bouncycastle.operator.OperatorCreationException;
+import org.bouncycastle.operator.jcajce.JcaContentSignerBuilder;
+import org.bouncycastle.pkcs.PKCS10CertificationRequest;
+import org.bouncycastle.pkcs.PKCS10CertificationRequestBuilder;
+import org.bouncycastle.pkcs.PKCS10CertificationRequestHolder;
+import org.bouncycastle.pkcs.jcajce.JcaPKCS10CertificationRequestBuilder;
+import sun.security.x509.X500Name;
 
 import javax.crypto.Cipher;
 import javax.crypto.CipherInputStream;
@@ -451,6 +457,17 @@ public class Utils {
             Utils.closeIgnoreExceptions(fileWriter);
         }
     }
+
+    /*
+    public static String toPem (PublicKey publicKey, String password) {
+
+    }
+
+    public static void writeAsPem(String filename, PublicKey publicKey, String password) {
+        String pemString = toPem(publicKey, password);
+        writeTextFile(filename, pemString);
+    }
+    */
 
     public static void writeAsPem(String filename, PrivateKey privateKey) throws IOException {
         FileWriter fileWriter = null;
