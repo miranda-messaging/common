@@ -601,4 +601,17 @@ public class Utils {
         is1.close();
         return theCert;
     }
+
+    public static String toStacktrace (Throwable t) {
+        PrintWriter printWriter = null;
+        try {
+            StringWriter stringWriter = new StringWriter();
+            printWriter = new PrintWriter(stringWriter);
+            t.printStackTrace(printWriter);
+            printWriter.close();
+            return stringWriter.toString();
+        } finally {
+            closeIgnoreExceptions(printWriter);
+        }
+    }
 }
