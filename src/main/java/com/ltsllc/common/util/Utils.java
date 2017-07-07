@@ -17,19 +17,25 @@
 package com.ltsllc.common.util;
 
 
+import org.bouncycastle.asn1.x509.AlgorithmIdentifier;
 import org.bouncycastle.asn1.x509.SubjectPublicKeyInfo;
+import org.bouncycastle.asn1.x509.X509CertificateStructure;
+import org.bouncycastle.cert.X509CertificateHolder;
+import org.bouncycastle.cert.X509v3CertificateBuilder;
+import org.bouncycastle.crypto.params.AsymmetricKeyParameter;
+import org.bouncycastle.crypto.util.PrivateKeyFactory;
 import org.bouncycastle.jce.provider.BouncyCastleProvider;
-import org.bouncycastle.openssl.*;
+import org.bouncycastle.openssl.PEMParser;
+import org.bouncycastle.openssl.PEMWriter;
 import org.bouncycastle.openssl.jcajce.JcaPEMKeyConverter;
-import org.bouncycastle.openssl.jcajce.JceOpenSSLPKCS8EncryptorBuilder;
-import org.bouncycastle.openssl.jcajce.JcePEMDecryptorProviderBuilder;
 import org.bouncycastle.operator.ContentSigner;
+import org.bouncycastle.operator.DefaultDigestAlgorithmIdentifierFinder;
+import org.bouncycastle.operator.DefaultSignatureAlgorithmIdentifierFinder;
 import org.bouncycastle.operator.OperatorCreationException;
-import org.bouncycastle.operator.jcajce.JcaContentSignerBuilder;
+import org.bouncycastle.operator.bc.BcRSAContentSignerBuilder;
 import org.bouncycastle.pkcs.PKCS10CertificationRequest;
-import org.bouncycastle.pkcs.PKCS10CertificationRequestBuilder;
 import org.bouncycastle.pkcs.PKCS10CertificationRequestHolder;
-import org.bouncycastle.pkcs.jcajce.JcaPKCS10CertificationRequestBuilder;
+import sun.security.pkcs10.PKCS10;
 import sun.security.x509.X500Name;
 
 import javax.crypto.Cipher;
@@ -39,10 +45,12 @@ import javax.net.ssl.SSLContext;
 import javax.net.ssl.TrustManagerFactory;
 import javax.servlet.ServletInputStream;
 import java.io.*;
+import java.math.BigInteger;
 import java.net.Socket;
 import java.nio.ByteBuffer;
 import java.security.*;
-import java.security.cert.X509Certificate;
+import java.security.cert.*;
+import java.util.Date;
 
 
 /**
@@ -558,5 +566,39 @@ public class Utils {
         }
 
         return byteArrayOutputStream.toByteArray();
+    }
+
+    public static X509Certificate sign(PrivateKey caPrivate, PublicKey signeePublic,
+                                       X500Name issuer, Date notValidBefore, Date notValidAfter, BigInteger serialNumber,
+                                       X500Name subject)
+            throws InvalidKeyException, NoSuchAlgorithmException,
+            NoSuchProviderException, SignatureException, IOException,
+            OperatorCreationException, CertificateException {
+
+        AlgorithmIdentifier sigAlgId = new DefaultSignatureAlgorithmIdentifierFinder()
+                .find("SHA1withRSA");
+        AlgorithmIdentifier digAlgId = new DefaultDigestAlgorithmIdentifierFinder()
+                .find(sigAlgId);
+
+        AsymmetricKeyParameter foo = PrivateKeyFactory.createKey(caPrivate.getEncoded());
+        SubjectPublicKeyInfo keyInfo = SubjectPublicKeyInfo.getInstance(signeePublic.getEncoded());
+
+        org.bouncycastle.asn1.x500.X500Name bcIssuer = new org.bouncycastle.asn1.x500.X500Name(issuer.getName());
+        org.bouncycastle.asn1.x500.X500Name bcSubject = new org.bouncycastle.asn1.x500.X500Name(subject.getName());
+        X509v3CertificateBuilder myCertificateGenerator = new X509v3CertificateBuilder(bcIssuer, serialNumber,
+                notValidBefore, notValidAfter, bcSubject, keyInfo);
+
+        ContentSigner sigGen = new BcRSAContentSignerBuilder(sigAlgId, digAlgId)
+                .build(foo);
+
+        X509CertificateHolder holder = myCertificateGenerator.build(sigGen);
+        X509CertificateStructure eeX509CertificateStructure = holder.toASN1Structure();
+
+        CertificateFactory cf = CertificateFactory.getInstance("X.509", "BC");
+
+        InputStream is1 = new ByteArrayInputStream(eeX509CertificateStructure.getEncoded());
+        X509Certificate theCert = (X509Certificate) cf.generateCertificate(is1);
+        is1.close();
+        return theCert;
     }
 }
