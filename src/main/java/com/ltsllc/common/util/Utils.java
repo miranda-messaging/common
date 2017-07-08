@@ -43,6 +43,7 @@ import javax.crypto.CipherInputStream;
 import javax.net.ssl.KeyManagerFactory;
 import javax.net.ssl.SSLContext;
 import javax.net.ssl.TrustManagerFactory;
+import javax.security.auth.Subject;
 import javax.servlet.ServletInputStream;
 import java.io.*;
 import java.math.BigInteger;
@@ -50,6 +51,7 @@ import java.net.Socket;
 import java.nio.ByteBuffer;
 import java.security.*;
 import java.security.cert.*;
+import java.security.spec.PKCS8EncodedKeySpec;
 import java.util.Date;
 
 
@@ -613,5 +615,65 @@ public class Utils {
         } finally {
             closeIgnoreExceptions(printWriter);
         }
+    }
+
+    public static String readTextFile (String filename) throws IOException {
+        StringWriter stringWriter = new StringWriter();
+        FileReader fileReader = null;
+        try {
+            fileReader = new FileReader(filename);
+            int c = fileReader.read();
+            while (c != -1) {
+                stringWriter.write(c);
+                c = fileReader.read();
+            }
+        } finally {
+            closeIgnoreExceptions(fileReader);
+        }
+
+        return fileReader.toString();
+    }
+
+    public static void writeTextFile (String filename, String content) throws IOException {
+        FileWriter fileWriter = null;
+        try {
+            fileWriter = new FileWriter(filename);
+            fileWriter.write(content);
+        } finally {
+            closeIgnoreExceptions(fileWriter);
+        }
+    }
+
+    public static PublicKey toPublicKey (String pem) throws IOException {
+        StringReader stringReader = new StringReader(pem);
+        PEMParser parser = new PEMParser(stringReader);
+        SubjectPublicKeyInfo subjectPublicKeyInfo = (SubjectPublicKeyInfo) parser.readObject();
+        JcaPEMKeyConverter converter = new JcaPEMKeyConverter();
+        converter.setProvider(new BouncyCastleProvider());
+        return converter.getPublicKey(subjectPublicKeyInfo);
+    }
+
+    public static PrivateKey toPrivateKey (String pem) throws IOException, GeneralSecurityException {
+        StringReader stringReader = new StringReader(pem);
+        PEMParser parser = new PEMParser(stringReader);
+        PKCS8EncodedKeySpec pkcs8EncodedKeySpec = (PKCS8EncodedKeySpec) parser.readObject();
+        KeyFactory kf = KeyFactory.getInstance("RSA");
+        return kf.generatePrivate(pkcs8EncodedKeySpec);
+    }
+
+    public static String toPem (PublicKey publicKey) throws IOException {
+        StringWriter stringWriter = new StringWriter();
+        PEMWriter pemWriter = new PEMWriter(stringWriter);
+        pemWriter.writeObject(publicKey);
+        pemWriter.close();
+        return stringWriter.toString();
+    }
+
+    public static String toPem (PrivateKey privateKey) throws IOException {
+        StringWriter stringWriter = new StringWriter();
+        PEMWriter pemWriter = new PEMWriter(stringWriter);
+        pemWriter.writeObject(privateKey);
+        pemWriter.close();
+        return stringWriter.toString();
     }
 }
