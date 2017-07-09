@@ -73,6 +73,15 @@ abstract public class CommandLine {
         return value;
     }
 
+    public String getArgAndAdvanceOrError (String message) {
+        String value = getArg();
+
+        if (null == value)
+            printErrorAndUsageAndExit(message);
+
+        advance();
+        return value;
+    }
 
     public String[] getArgv() {
         return argv;
