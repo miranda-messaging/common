@@ -17,6 +17,7 @@
 package com.ltsllc.common.util;
 
 
+import org.bouncycastle.asn1.pkcs.PrivateKeyInfo;
 import org.bouncycastle.asn1.x509.AlgorithmIdentifier;
 import org.bouncycastle.asn1.x509.SubjectPublicKeyInfo;
 import org.bouncycastle.asn1.x509.X509CertificateStructure;
@@ -24,26 +25,25 @@ import org.bouncycastle.cert.X509CertificateHolder;
 import org.bouncycastle.cert.X509v3CertificateBuilder;
 import org.bouncycastle.crypto.params.AsymmetricKeyParameter;
 import org.bouncycastle.crypto.util.PrivateKeyFactory;
+import org.bouncycastle.jcajce.util.DefaultJcaJceHelper;
 import org.bouncycastle.jce.provider.BouncyCastleProvider;
-import org.bouncycastle.openssl.PEMParser;
-import org.bouncycastle.openssl.PEMWriter;
-import org.bouncycastle.openssl.jcajce.JcaPEMKeyConverter;
-import org.bouncycastle.operator.ContentSigner;
-import org.bouncycastle.operator.DefaultDigestAlgorithmIdentifierFinder;
-import org.bouncycastle.operator.DefaultSignatureAlgorithmIdentifierFinder;
-import org.bouncycastle.operator.OperatorCreationException;
+import org.bouncycastle.openssl.*;
+import org.bouncycastle.openssl.jcajce.*;
+import org.bouncycastle.operator.*;
 import org.bouncycastle.operator.bc.BcRSAContentSignerBuilder;
-import org.bouncycastle.pkcs.PKCS10CertificationRequest;
-import org.bouncycastle.pkcs.PKCS10CertificationRequestHolder;
-import sun.security.pkcs10.PKCS10;
+import org.bouncycastle.pkcs.PKCS8EncryptedPrivateKeyInfo;
+import org.bouncycastle.pkcs.PKCSException;
+import org.bouncycastle.pkcs.bc.BcPKCS12PBEInputDecryptorProviderBuilder;
+import org.bouncycastle.util.io.pem.PemObject;
+import org.bouncycastle.util.io.pem.PemReader;
 import sun.security.x509.X500Name;
 
 import javax.crypto.Cipher;
 import javax.crypto.CipherInputStream;
+import javax.crypto.EncryptedPrivateKeyInfo;
 import javax.net.ssl.KeyManagerFactory;
 import javax.net.ssl.SSLContext;
 import javax.net.ssl.TrustManagerFactory;
-import javax.security.auth.Subject;
 import javax.servlet.ServletInputStream;
 import java.io.*;
 import java.math.BigInteger;
@@ -51,6 +51,7 @@ import java.net.Socket;
 import java.nio.ByteBuffer;
 import java.security.*;
 import java.security.cert.*;
+import java.security.cert.Certificate;
 import java.security.spec.PKCS8EncodedKeySpec;
 import java.util.Date;
 
@@ -631,7 +632,7 @@ public class Utils {
             closeIgnoreExceptions(fileReader);
         }
 
-        return fileReader.toString();
+        return stringWriter.toString();
     }
 
     public static void writeTextFile (String filename, String content) throws IOException {
@@ -656,9 +657,9 @@ public class Utils {
     public static PrivateKey toPrivateKey (String pem) throws IOException, GeneralSecurityException {
         StringReader stringReader = new StringReader(pem);
         PEMParser parser = new PEMParser(stringReader);
-        PKCS8EncodedKeySpec pkcs8EncodedKeySpec = (PKCS8EncodedKeySpec) parser.readObject();
-        KeyFactory kf = KeyFactory.getInstance("RSA");
-        return kf.generatePrivate(pkcs8EncodedKeySpec);
+        PEMKeyPair pemKeyPair = (PEMKeyPair) parser.readObject();
+        JcaPEMKeyConverter jcaPEMKeyConverter = new JcaPEMKeyConverter().setProvider(new BouncyCastleProvider());
+        return jcaPEMKeyConverter.getPrivateKey(pemKeyPair.getPrivateKeyInfo());
     }
 
     public static String toPem (PublicKey publicKey) throws IOException {
@@ -675,5 +676,87 @@ public class Utils {
         pemWriter.writeObject(privateKey);
         pemWriter.close();
         return stringWriter.toString();
+    }
+
+    public static PrivateKey loadEncryptedPrivateKey (String filename, String password)
+            throws IOException, PKCSException, OperatorException {
+        PEMParser pemParser = null;
+
+        try {
+            FileReader fileReader = new FileReader(filename);
+            pemParser = new PEMParser(fileReader);
+            Object o = pemParser.readObject();
+            PKCS8EncryptedPrivateKeyInfo pkcs8EncryptedPrivateKeyInfo = (PKCS8EncryptedPrivateKeyInfo) pemParser.readObject();
+            JceOpenSSLPKCS8DecryptorProviderBuilder jceOpenSSLPKCS8DecryptorProviderBuilder = new JceOpenSSLPKCS8DecryptorProviderBuilder();
+            InputDecryptorProvider inputDecryptorProvider = jceOpenSSLPKCS8DecryptorProviderBuilder.build(password.toCharArray());
+            PrivateKeyInfo privateKeyInfo = pkcs8EncryptedPrivateKeyInfo.decryptPrivateKeyInfo(inputDecryptorProvider);
+            JcaPEMKeyConverter jcaPEMKeyConverter = new JcaPEMKeyConverter();
+            return jcaPEMKeyConverter.getPrivateKey(privateKeyInfo);
+        } finally {
+            Utils.closeIgnoreExceptions(pemParser);
+        }
+    }
+
+    public static final String PEM_ENCRYPTION_ALGORITHM = "DES-EDE3-CBC";
+
+    public static void writeAsPem (String filename, String password, java.security.PublicKey publicKey)
+            throws IOException
+    {
+        JcaPEMWriter pemWriter = null;
+
+        try {
+            FileWriter fileWriter = new FileWriter(filename);
+            pemWriter = new JcaPEMWriter(fileWriter);
+            JcePEMEncryptorBuilder builder = new JcePEMEncryptorBuilder(PEM_ENCRYPTION_ALGORITHM);
+            builder.setProvider(new BouncyCastleProvider());
+            pemWriter.writeObject(publicKey, builder.build(password.toCharArray()));
+        } finally {
+            Utils.closeIgnoreExceptions(pemWriter);
+        }
+    }
+
+    public static void writeAsPem (String filename, String password, java.security.PrivateKey privateKey)
+            throws IOException
+    {
+        JcaPEMWriter pemWriter = null;
+
+        try {
+            FileWriter fileWriter = new FileWriter(filename);
+            pemWriter = new JcaPEMWriter(fileWriter);
+            JcePEMEncryptorBuilder builder = new JcePEMEncryptorBuilder(PEM_ENCRYPTION_ALGORITHM);
+            builder.setProvider(new BouncyCastleProvider());
+            pemWriter.writeObject(privateKey, builder.build(password.toCharArray()));
+        } finally {
+            Utils.closeIgnoreExceptions(pemWriter);
+        }
+
+    }
+
+    public static void writeAsPem (String filename, String password, KeyPair keyPair) throws IOException {
+        JcaPEMWriter pemWriter = null;
+
+        try {
+            FileWriter fileWriter = new FileWriter(filename);
+            pemWriter = new JcaPEMWriter(fileWriter);
+            JcePEMEncryptorBuilder builder = new JcePEMEncryptorBuilder(PEM_ENCRYPTION_ALGORITHM);
+            builder.setProvider(new BouncyCastleProvider());
+            pemWriter.writeObject(keyPair, builder.build(password.toCharArray()));
+        } finally {
+            Utils.closeIgnoreExceptions(pemWriter);
+        }
+    }
+
+    public static void writeAsPem (String filename, String password, Certificate certificate) throws IOException {
+        JcaPEMWriter pemWriter = null;
+
+        try {
+            FileWriter fileWriter = new FileWriter(filename);
+            pemWriter = new JcaPEMWriter(fileWriter);
+            JcePEMEncryptorBuilder encryptorBuilder = new JcePEMEncryptorBuilder(PEM_ENCRYPTION_ALGORITHM);
+            encryptorBuilder.setProvider(new BouncyCastleProvider());
+            pemWriter.writeObject(certificate, encryptorBuilder.build(password.toCharArray()));
+        } finally {
+            Utils.closeIgnoreExceptions(pemWriter);
+        }
     }
 }
